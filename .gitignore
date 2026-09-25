@@ -1,0 +1,23 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Caches and environments
+.ipynb_checkpoints/
+.pytest_cache/
+.env
+venv/
+env/
+
+# Data directories & archives
+data/
+**/data/
+*.zip
+*.tar.gz
+*.csv
+
+# OS specific files
+.DS_Store
+Thumbs.db
+desktop.ini
