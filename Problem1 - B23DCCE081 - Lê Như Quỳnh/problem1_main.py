@@ -55,14 +55,12 @@ def calculate_metrics(y_true, y_pred, time_ms, w_learned=None):
 
 
 def run_problem1_pipeline():
-    print("=" * 95)
-    print(
-        "      PROBLEM 1: LINEAR REGRESSION FROM FIRST PRINCIPLES (ONLINE NEWS POPULARITY DATASET)"
-    )
-    print("=" * 95)
+    print("=" * 80)
+    print("Problem 1: Hồi quy tuyến tính từ các nguyên lý cơ bản (Online News Popularity)")
+    print("=" * 80)
 
-    # 1. Tải và tiền xử lý dữ liệu
-    print("\n---> [BƯỚC 1] NẠP VÀ TIỀN XỬ LÝ DỮ LIỆU DỰ ÁN...")
+    # 1. Đọc và tiền xử lý dữ liệu
+    print("\n1. Đọc và tiền xử lý dữ liệu...")
     data = load_and_preprocess_news_data(use_log_target=True, test_ratio=0.2)
 
     X_tr_scaled = data["X_train_scaled"]
@@ -73,34 +71,30 @@ def run_problem1_pipeline():
     X_tr_raw = data["X_train_raw"]
     X_te_raw = data["X_test_raw"]
 
-    print(
-        "\n---> [BƯỚC 2] HUẤN LUYỆN VÀ ĐÁNH GIÁ CÁC MÔ HÌNH SCRATCH (FIRST PRINCIPLES)..."
-    )
-
-    # Đăng ký các mô hình cần thử nghiệm với siêu tham số ổn định
+    # 2. Huấn luyện các mô hình từ đầu
+    print("\n2. Huấn luyện các mô hình hồi quy...")
     models_scratch = {
-        "1. Normal Equation (Closed-Form)": LinearRegressionNormalEq(),
-        "2. Batch GD (BGD, lr=0.01, 500 ep)": LinearRegressionBGD(
+        "Normal Equation": LinearRegressionNormalEq(),
+        "Batch GD (lr=0.01, 500 ep)": LinearRegressionBGD(
             learning_rate=0.01, epochs=500
         ),
-        "3. Mini-Batch GD (MBGD, B=256, lr=0.005, 300 ep)": LinearRegressionMBGD(
+        "Mini-Batch GD (B=256, lr=0.005, 300 ep)": LinearRegressionMBGD(
             learning_rate=0.005, epochs=300, batch_size=256
         ),
-        "4. Stochastic GD (SGD, lr=0.001, 30 ep)": LinearRegressionSGD(
+        "Stochastic GD (lr=0.001, 30 ep)": LinearRegressionSGD(
             learning_rate=0.001, epochs=30, decay=1e-4
         ),
     }
 
     results = {}
-
     for name, model in models_scratch.items():
         model.fit(X_tr_scaled, y_tr)
         y_pred = model.predict(X_te_scaled)
         res = calculate_metrics(y_te, y_pred, model.execution_time_ms, model.w)
         results[name] = res
 
-    # 3. Đánh giá Mô hình Scikit-learn (Least Squares OLS) làm Benchmark
-    print("\n---> [BƯỚC 3] HUẤN LUYỆN MÔ HÌNH BENCHMARK SCIKIT-LEARN (OLS)...")
+    # 3. Đánh giá mô hình Scikit-learn
+    print("\n3. Đánh giá mô hình Scikit-Learn...")
     sk_model = SklearnLinearRegression()
     t0 = time.time()
     sk_model.fit(X_tr_scaled, y_tr)
@@ -109,68 +103,30 @@ def run_problem1_pipeline():
 
     w_sk = np.hstack(([sk_model.intercept_], sk_model.coef_)).reshape(-1, 1)
     res_sk = calculate_metrics(y_te, y_pred_sk, sk_time, w_sk)
-    results["5. Scikit-Learn LinearRegression (OLS)"] = res_sk
+    results["Scikit-Learn LinearRegression"] = res_sk
 
-    # 4. In bảng so sánh kết quả
-    print("\n" + "=" * 105)
+    # 4. In bảng kết quả
+    print("\n" + "=" * 90)
     print(
-        f"{'THUẬT TOÁN / MÔ HÌNH':<42} | {'MSE':<9} | {'RMSE':<9} | {'MAE':<9} | {'R² SCORE':<9} | {'THỜI GIAN (ms)':<14}"
+        f"{'Mô hình':<35} | {'MSE':<9} | {'RMSE':<9} | {'MAE':<9} | {'R2 Score':<9} | {'Thời gian (ms)':<14}"
     )
-    print("=" * 105)
+    print("=" * 90)
     for name, res in results.items():
         print(
-            f"{name:<42} | {res['mse']:<9.4f} | {res['rmse']:<9.4f} | {res['mae']:<9.4f} | {res['r2']:<9.4f} | {res['time_ms']:<14.2f}"
+            f"{name:<35} | {res['mse']:<9.4f} | {res['rmse']:<9.4f} | {res['mae']:<9.4f} | {res['r2']:<9.4f} | {res['time_ms']:<14.2f}"
         )
-    print("=" * 105)
+    print("=" * 90)
 
-    # 5. Kiểm chứng tính công bằng (Fair Benchmark Verification)
-    w_scratch_norm = results["1. Normal Equation (Closed-Form)"]["weights"]
+    # 5. Phân tích đa cộng tuyến
+    w_scratch_norm = results["Normal Equation"]["weights"]
     w_diff_norm = np.linalg.norm(w_scratch_norm - w_sk)
-    print(
-        f"\n[+] ĐỘ LỆCH VECTOR TRỌNG SỐ (Scratch Normal Eq vs Sklearn OLS): ||w_scratch - w_sklearn||₂ = {w_diff_norm:.8e}"
-    )
-    print(
-        f"[+] ĐỘ LỆCH MSE GIỮA SCRATCH NORMAL EQ VÀ SKLEARN: {abs(results['1. Normal Equation (Closed-Form)']['mse'] - res_sk['mse']):.8e}"
-    )
-
-    # 5b. Phân tích Đa cộng tuyến (Multicollinearity Analysis)
-    print("\n--- [BƯỚC 3b] PHÂN TÍCH ĐA CỘNG TUYẾN (MULTICOLLINEARITY) ---")
     cond_number = np.linalg.cond(np.dot(X_tr_scaled.T, X_tr_scaled))
-    print(f"[+] Condition Number (κ) của X^T X: {cond_number:.2e}")
-    print(
-        f"    GIẢI THÍCH: κ rất lớn => ma trận X^T X gần suy biến do multicollinearity."
-    )
-    print(f"    => Tồn tại nhiều nghiệm w tối ưu khác nhau cho cùng một MSE tối thiểu.")
-    print(
-        f"    => Pseudoinverse (SVD) và sklearn (LAPACK) chọn nghiệm khác nhau trong null space,"
-    )
-    print(
-        f"       dẫn đến ||w_scratch - w_sklearn||₂ = {w_diff_norm:.2e} nhưng MSE chênh lệch chỉ {abs(results['1. Normal Equation (Closed-Form)']['mse'] - res_sk['mse']):.2e}."
-    )
-    print(
-        f"    KẾT LUẬN: So sánh MSE/R² là CÔNG BẰNG. So sánh trọng số không có ý nghĩa khi có multicollinearity."
-    )
+    print(f"\nCondition number của X^T X: {cond_number:.2e}")
+    print(f"Khoảng cách trọng số ||w_scratch - w_sklearn||: {w_diff_norm:.4e}")
+    print(f"Chênh lệch MSE giữa Normal Eq và Sklearn: {abs(results['Normal Equation']['mse'] - res_sk['mse']):.4e}")
 
-    # 5c. Thảo luận R² thấp
-    r2_best = max(res["r2"] for res in results.values())
-    print(f"\n[+] THẢO LUẬN VỀ R² THẤP (R² tốt nhất = {r2_best:.4f}):")
-    print(
-        f"    Online News Popularity dự đoán lượt chia sẻ bài viết — bản chất phi tuyến,"
-    )
-    print(
-        f"    phụ thuộc vào nội dung ngữ nghĩa, thời điểm viral, hiệu ứng mạng xã hội."
-    )
-    print(
-        f"    Mô hình tuyến tính chỉ dựa vào 58 meta-features => R² ~ 0.12 là kỳ vọng."
-    )
-    print(
-        f"    Đây là GIỚI HẠN CỐ HỮU của mô hình tuyến tính, không phải lỗi implementation."
-    )
-
-    # 6. KHẢO SÁT 1: TÁC ĐỘNG CỦA FEATURE SCALING ĐẾN HỘI TỤ
-    print(
-        "\n---> [BƯỚC 4] THỰC NGHIỆM KHẢO SÁT TÁC ĐỘNG CỦA FEATURE SCALING VÀ LEARNING RATE..."
-    )
+    # 6. Khảo sát feature scaling và learning rate
+    print("\n4. Khảo sát Feature Scaling và Learning Rate...")
     bgd_raw = LinearRegressionBGD(learning_rate=1e-12, epochs=500)
     bgd_raw.fit(X_tr_raw, y_tr)
 

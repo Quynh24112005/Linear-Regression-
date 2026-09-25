@@ -76,22 +76,20 @@ def cross_validate(model_cls, X, y, alphas, k_folds=5):
 
 
 def run_problem2_pipeline():
-    print("=" * 105)
-    print(
-        "      PROBLEM 2: BASIS EXPANSION, REGULARIZATION, AND DIAGNOSTICS (BIKE SHARING DATASET)"
-    )
-    print("=" * 105)
+    print("=" * 80)
+    print("Problem 2: Mở rộng hàm cơ sở, Điều chuẩn và Chẩn đoán (Bike Sharing)")
+    print("=" * 80)
 
-    # 1. Nạp dữ liệu và kiểm tra rò rỉ
-    print("\n---> [BƯỚC 1] NẠP VÀ PHÂN CHIA DỮ LIỆU CHỐNG LEAKAGE...")
+    # 1. Đọc và tiền xử lý dữ liệu
+    print("\n1. Đọc dữ liệu và chia train/test...")
     data = load_and_preprocess_bike_data(use_log_target=True)
     X_tr_df = data["X_train_df"]
     y_tr = data["y_train"]
     X_te_df = data["X_test_df"]
     y_te = data["y_test"]
 
-    # 2. Xây dựng các cấp độ Mở rộng Hàm cơ sở (Basis Expansion)
-    print("\n---> [BƯỚC 2] MỞ RỘNG HÀM CƠ SỞ (BASIS EXPANSION LEVELS)...")
+    # 2. Mở rộng hàm cơ sở theo 3 cấp độ
+    print("\n2. Mở rộng hàm cơ sở...")
     be_lvl0 = BikeBasisExpansion(level=0)
     X_tr_l0 = be_lvl0.fit_transform(X_tr_df)
     X_te_l0 = be_lvl0.transform(X_te_df)
@@ -105,18 +103,12 @@ def run_problem2_pipeline():
     X_te_l2 = be_lvl2.transform(X_te_df)
     feature_names_l2 = be_lvl2.feature_names
 
-    print(f"[+] Level 0 (Raw Features): {X_tr_l0.shape[1]} đặc trưng")
-    print(
-        f"[+] Level 1 (Cyclic Basis): {X_tr_l1.shape[1]} đặc trưng (Thêm chu kỳ lượng giác giờ, tháng, thứ)"
-    )
-    print(
-        f"[+] Level 2 (Cyclic + Poly + Interactions): {X_tr_l2.shape[1]} đặc trưng (Thêm tương tác thời tiết & đi làm)"
-    )
+    print(f"Số đặc trưng Level 0: {X_tr_l0.shape[1]}")
+    print(f"Số đặc trưng Level 1: {X_tr_l1.shape[1]}")
+    print(f"Số đặc trưng Level 2: {X_tr_l2.shape[1]}")
 
-    # 3. Đánh giá OLS trên các cấp độ đặc trưng
-    print(
-        "\n---> [BƯỚC 3] HUẤN LUYỆN OLS TRÊN CÁC CẤP ĐỘ BASIS VÀ KHẢO SÁT OVERFITTING..."
-    )
+    # 3. Đánh giá OLS trên các cấp độ
+    print("\n3. Đánh giá OLS trên các cấp độ đặc trưng...")
     ols_l0 = OLSLinearRegression().fit(X_tr_l0, y_tr)
     ols_l1 = OLSLinearRegression().fit(X_tr_l1, y_tr)
     ols_l2 = OLSLinearRegression().fit(X_tr_l2, y_tr)
@@ -131,23 +123,21 @@ def run_problem2_pipeline():
         y_te, ols_l2.predict(X_te_l2), ols_l2.execution_time_ms, ols_l2
     )
 
-    # 4. K-Fold Cross-Validation chọn alpha tối ưu cho Ridge và LASSO trên Level 2
-    print(
-        "\n---> [BƯỚC 4] K-FOLD CROSS-VALIDATION CHỌN ALPHA TỐI ƯU (RIDGE & LASSO)..."
-    )
+    # 4. Đánh giá chéo 5-fold chọn alpha cho Ridge và Lasso
+    print("\n4. Đánh giá chéo 5-fold chọn alpha cho Ridge và Lasso...")
     alphas_ridge = np.logspace(-4, 2, 25)
     best_alpha_ridge, alphas_r_grid, cv_scores_ridge = cross_validate(
         RidgeRegressionScratch, X_tr_l2, y_tr, alphas_ridge, k_folds=5
     )
-    print(f"[+] Ridge Alpha tối ưu qua 5-Fold CV: alpha* = {best_alpha_ridge:.6f}")
+    print(f"Ridge alpha tối ưu: {best_alpha_ridge:.6f}")
 
     alphas_lasso = np.logspace(-4, -1, 20)
     best_alpha_lasso, alphas_l_grid, cv_scores_lasso = cross_validate(
         LassoRegressionScratch, X_tr_l2, y_tr, alphas_lasso, k_folds=5
     )
-    print(f"[+] LASSO Alpha tối ưu qua 5-Fold CV: alpha* = {best_alpha_lasso:.6f}")
+    print(f"Lasso alpha tối ưu: {best_alpha_lasso:.6f}")
 
-    # 5. Huấn luyện mô hình tối ưu trên toàn bộ Train và kiểm thử trên Test độc lập
+    # 5. Huấn luyện mô hình tối ưu trên toàn bộ Train
     ridge_opt = RidgeRegressionScratch(alpha=best_alpha_ridge).fit(X_tr_l2, y_tr)
     lasso_opt = LassoRegressionScratch(alpha=best_alpha_lasso, epochs=2000).fit(
         X_tr_l2, y_tr
@@ -160,20 +150,20 @@ def run_problem2_pipeline():
         y_te, lasso_opt.predict(X_te_l2), lasso_opt.execution_time_ms, lasso_opt
     )
 
-    # 6. In bảng so sánh toàn diện
+    # 6. Bảng so sánh kết quả
     results_all = {
-        "1. OLS (Level 0 - Raw Features)": res_ols_l0,
-        "2. OLS (Level 1 - Cyclic Basis)": res_ols_l1,
-        "3. OLS (Level 2 - Full Basis Expansion)": res_ols_l2,
-        f"4. Ridge (Level 2, alpha={best_alpha_ridge:.4f})": res_ridge,
-        f"5. LASSO (Level 2, alpha={best_alpha_lasso:.4f})": res_lasso,
+        "OLS Level 0": res_ols_l0,
+        "OLS Level 1": res_ols_l1,
+        "OLS Level 2": res_ols_l2,
+        f"Ridge Level 2 (alpha={best_alpha_ridge:.4f})": res_ridge,
+        f"Lasso Level 2 (alpha={best_alpha_lasso:.4f})": res_lasso,
     }
 
-    print("\n" + "=" * 115)
+    print("\n" + "=" * 90)
     print(
-        f"{'MÔ HÌNH / PHƯƠNG PHÁP':<45} | {'TEST MSE':<9} | {'TEST RMSE':<9} | {'TEST MAE':<9} | {'TEST R²':<9} | {'ĐỘ THƯA (SPARSITY)':<18}"
+        f"{'Mô hình':<35} | {'MSE':<9} | {'RMSE':<9} | {'MAE':<9} | {'R2':<9} | {'Sparsity':<10}"
     )
-    print("=" * 115)
+    print("=" * 90)
     for name, res in results_all.items():
         sparsity_str = (
             f"{res['sparsity']} / {X_tr_l2.shape[1]} (0s)"
